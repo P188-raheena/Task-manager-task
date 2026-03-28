@@ -1,0 +1,100 @@
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+
+const app = express();
+app.use(bodyParser.json());
+app.use(cors());
+
+// MongoDB Connection
+mongoose.connect("mongodb://127.0.0.1:27017/taskdb")
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.log(err));
+
+// Schema
+const TaskSchema = new mongoose.Schema({
+  title: String,
+  completed: Boolean
+});
+
+const Task = mongoose.model("Task", TaskSchema);
+
+// ROUTES
+
+// Get all tasks
+app.get("/tasks", async (req, res) => {
+  const tasks = await Task.find();
+  res.json(tasks);
+});
+
+// Add task
+app.post("/tasks", async (req, res) => {
+  const task = new Task({
+    title: req.body.title,
+    completed: false
+  });
+  await task.save();
+  res.json(task);
+});
+
+// Delete task
+app.delete("/tasks/:id", async (req, res) => {
+  await Task.findByIdAndDelete(req.params.id);
+  res.json("Deleted");
+});
+
+// Serve frontend
+app.get("/", (req, res) => {
+  res.send(`
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Task Manager</title>
+  </head>
+  <body>
+    <h2>🚀 Task Manager</h2>
+
+    <input id="task" placeholder="Enter task">
+    <button onclick="addTask()">Add</button>
+
+    <ul id="list"></ul>
+
+    <script>
+      async function loadTasks(){
+        const res = await fetch('/tasks');
+        const data = await res.json();
+
+        list.innerHTML = "";
+        data.forEach(t => {
+          const li = document.createElement('li');
+          li.innerHTML = t.title + 
+            " <button onclick='deleteTask(\""+t._id+"\")'>❌</button>";
+          list.appendChild(li);
+        });
+      }
+
+      async function addTask(){
+        await fetch('/tasks',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({title:task.value})
+        });
+        task.value = "";
+        loadTasks();
+      }
+
+      async function deleteTask(id){
+        await fetch('/tasks/'+id,{method:'DELETE'});
+        loadTasks();
+      }
+
+      loadTasks();
+    </script>
+  </body>
+  </html>
+  `);
+});
+
+// Start server
+app.listen(5000, () => console.log("Server running on http://localhost:5000"));
